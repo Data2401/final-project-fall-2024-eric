@@ -1,0 +1,329 @@
+---
+title: 'How to Win in Basketball: Analyzing 2024 Men''s D1 Collegiate Basketball Season'
+author: "Eric Simmons"
+date: "2024-11-10"
+output: slidy_presentation
+---
+
+# INTRODUCTION
+
+I was interested in comparing the statistics of all of the other Division I Men's basketball programs for the 2024 season. My dataset consists of the 362 college teams, with variables including Conference, Games Played, Games Won, Free Throw Rate, Three Point Shooting Percentage, and many others.
+
+I decided to ask several questions that would help illustrate the usage of R, such as the ways in which the variables interacted and particularly contributed to the successes or failures of individual teams. This information could later be applicable to what factors of a basketball season will lead to greater success or failure, in general.
+
+Each of these questions and my subsequent answers using R demonstrates my ability to analyze data using data visualization, data wrangling, & simple regression analysis. The results have been visualized through my R code and the graphs that I have produced.
+
+# NECESSARY PACKAGES
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse) # For data organization and manipulation (This includes dplyr package)
+library(ggplot2) # For data visualization
+library(knitr) # For report generation, table creation, and formatting
+```
+
+# Source and Background
+
+The dataset I used to complete my analysis is the [College Basketball Dataset (2024)](https://www.kaggle.com/datasets/andrewsundberg/college-basketball-dataset?resource=download&select=cbb24.csv).
+
+This dataset, provided by Kaggle user Andrew Sundberg, contains detailed information on college basketball teams for the 2024 season as of 3/18/2024 and was updated after the conclusion of the March Madness tournament.
+
+It includes various performance metrics for each team, spanning offensive and defensive statistics, win-loss records, and other key indicators. The dataset offers a comprehensive look at team dynamics and enables analysis of factors contributing to successful and unsuccessful seasons.
+
+```{r echo=FALSE}
+cbb24 <- read.csv("cbb24.csv")
+```
+
+# Viewing the structure of the dataset
+
+```{r echo=FALSE}
+glimpse(cbb24)
+```
+
+```{r echo=FALSE}
+cbb24 <- cbb24 %>% drop_na()
+```
+
+```{r echo=FALSE}
+cbb24 <- cbb24 %>%
+  mutate(across(where(is.character), as.factor))
+```
+
+# Key Variables in the Dataset
+
+-   TEAM: The name of each Division I college basketball team.
+-   CONF: The athletic conference in which each team participates, represented by abbreviations (e.g., ACC for Atlantic Coast Conference, SEC for Southeastern Conference).
+-   G: Total number of games played by each team.
+-   W: Number of games won by each team.
+-   ADJOE: Adjusted Offensive Efficiency -- Points scored per 100 possessions against an average Division I defense.
+-   ADJDE: Adjusted Defensive Efficiency -- Points allowed per 100 possessions against an average Division I offense.
+-   TOR: Turnover Percentage Allowed -- Measures turnover rate.
+-   TORD: Turnover Percentage Committed -- Measures steal rate.
+-   FTR: Free Throw Rate -- Frequency of shooting free throws.
+-   3P_O: Three-Point Shooting Percentage.
+
+# Summary of Some Main Key Variables in Cleaned Data
+
+```{r echo=FALSE}
+summary_table <- cbb24 %>%
+  summarise(
+    avg_games_played = mean(G),
+    avg_wins = mean(W),
+    avg_off_eff = mean(ADJOE),
+    avg_def_eff = mean(ADJDE),
+    avg_3p = mean(`X3P_O`)
+  )
+
+kable(summary_table, caption = "Summary of Key Variables in cbb24 Dataset")
+```
+
+# PROJECT QUESTIONS
+
+Now we will go into the questions I investigated with their explanations and their findings.
+
+# Top Team by Wins and Its Conference
+
+Which conference has the team with the highest number of wins?
+
+--By identifying the top-performing team's conference in 2024, I can explore whether certain conferences tend to produce more winning teams.
+
+```{r echo=FALSE}
+top_team <- cbb24 %>%
+  arrange(desc(W)) %>%
+  slice(1) %>%
+  select(TEAM, CONF, W)
+
+kable(top_team, caption = "Top Team by Wins and Its Conference")
+```
+
+# Average Number of Wins in Each Conference
+
+What are the average number of wins in each conference?
+
+--Finding the average number of wins in each conference will allow us to see which group of teams did the best on average throughout the whole season.
+
+```{r echo=FALSE}
+# Calculating the average number of wins for each conference
+conf_avg_wins <- cbb24 %>%
+  group_by(CONF) %>%
+  summarise(avg_wins = mean(W, na.rm = TRUE)) %>%
+  arrange(desc(avg_wins))
+
+# Viewing the table of average wins
+kable(conf_avg_wins, caption = "Average Wins by Conference in 2024")
+
+# Graphing the average number of wins per conference
+ggplot(conf_avg_wins, aes(x = reorder(CONF, -avg_wins), y = avg_wins)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Average Wins by Conference in 2024",
+       x = "Conference",
+       y = "Average Wins") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+# Impact of Three-Point Shooting on Wins in ACC
+
+How does the percentage of three-pointers made impact the number of games won within the ACC?
+
+--Analyzing this relationship provides insight into whether successful three-point shooting correlates with higher win counts in the ACC.
+
+```{r echo=FALSE}
+# Filtering ACC teams and analyzing three-point shooting
+acc_three <- cbb24 %>%
+  filter(CONF == "ACC")
+
+# Performing linear regression
+acc_model <- lm(W ~ X3P_O, data = acc_three)
+
+#Plotting the relationship
+ggplot(acc_three, aes(x = `X3P_O`, y = W)) +
+  geom_point(color = "blue") +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Impact of Three-Point Shooting on Wins in ACC",
+       x = "Three-Point Shooting Percentage",
+       y = "Wins")
+
+# Displaying the summary of the regression model
+summary(acc_model)
+```
+
+# ACC Teams with Above-Average Wins
+
+Which schools in the ACC have won more games than the average for all Division I teams?
+
+--This comparison allows me to identify standout ACC teams and assess their performance relative to the national average.
+
+```{r echo=FALSE}
+# Calculating the average number of wins for all teams
+avg_wins <- mean(cbb24$W)
+
+# Filtering for ACC teams and identifying those with more wins than the national average
+acc_above_avg <- cbb24 %>%
+  filter(CONF == "ACC" & W > avg_wins) %>%
+  select(TEAM, W)
+
+kable(acc_above_avg, caption = "ACC Teams with Above-Average Wins")
+```
+
+# Adjusted Efficiencies of Top Five Teams
+
+Among the top five teams in 2024 based on win count, is adjusted offensive efficiency or adjusted defensive efficiency higher on average?
+
+--This question examines whether top teams excel more in offensive or defensive play, providing a balanced view of team strengths.
+
+```{r echo=FALSE}
+top5_teams <- cbb24 %>%
+  arrange(desc(W)) %>%
+  slice(1:5) %>%
+  select(TEAM, W, ADJOE, ADJDE)
+
+kable(top5_teams, caption = "Adjusted Efficiencies of Top Five Teams")
+```
+
+```{r echo=FALSE}
+mean(top5_teams$ADJOE)
+mean(top5_teams$ADJDE)
+```
+
+# Average Turnover Rate for Top Five Teams
+
+What is the average number of turnovers for the top five winning teams?
+
+--Turnovers can impact game outcomes, so examining turnover rates among the most successful teams may highlight patterns in ball control.
+
+```{r echo=FALSE}
+# Getting the top 5 teams by wins and calculating their average turnover rate
+top5_turnovers <- cbb24 %>%
+  arrange(desc(W)) %>%
+  slice(1:5) %>%
+  summarise(avg_turnovers = mean(TOR))
+
+kable(top5_turnovers, caption = "Average Turnover Rate for Top Five Teams")
+```
+
+# Average Free Throw Rate for Top 20 Teams
+
+What are the average free throw rates among the top 20 teams? --Free throw performance can play a crucial role in close games, so this analysis explores whether the top teams tend to excel in this area.
+
+```{r echo=FALSE}
+# Getting the top 20 teams by wins and calculating their average free throw rate
+top20_ftr <- cbb24 %>%
+  arrange(desc(W)) %>%
+  slice(1:20) %>%
+  summarise(avg_free_throw_rate = mean(FTR))
+
+kable(top20_ftr, caption = "Average Free Throw Rate for Top 20 Teams")
+```
+
+# TRUE OR FALSE: Average Turnover Rate Above 20% for All Teams?
+
+Is the average turnover rate for all teams above 20%?
+
+--This analysis checks if high turnover rates are common across teams or if lower turnover rates are more typical.
+
+```{r echo=FALSE}
+# Calculating the average turnover rate across all teams
+avg_turnover_rate <- mean(cbb24$TOR)
+
+# Comparing the average to 20%
+above_20 <- avg_turnover_rate > 20
+
+list(
+  "Average Turnover Rate" = avg_turnover_rate,
+  "Is Average > 20%" = above_20
+)
+```
+
+# SIMPLE LINEAR REGRESSION: SEC Offensive and Defensive Efficiencies
+
+How do SEC teams' offensive and defensive efficiencies compare in 2024 based on a linear regression analysis?
+
+--Using linear regression, this question investigates whether SEC teams show balanced strengths in both offensive and defensive play.
+
+```{r echo=FALSE}
+# Filtering for SEC teams
+sec_teams <- cbb24 %>%
+  filter(CONF == "SEC")
+
+# Performing a linear regression analysis
+sec_lm <- lm(ADJDE ~ ADJOE, data = sec_teams)
+
+# Plotting the relationship
+ggplot(sec_teams, aes(x = ADJOE, y = ADJDE)) +
+  geom_point(color = "green") +
+  geom_smooth(method = "lm", color = "blue") +
+  labs(title = "Offensive vs. Defensive Efficiencies for SEC Teams",
+       x = "Adjusted Offensive Efficiency",
+       y = "Adjusted Defensive Efficiency")
+
+# Summarizing regression results
+summary(sec_lm)
+```
+
+# SIMPLE LINEAR REGRESSION: All Teams Offensive and Defensive Efficiencies
+
+How do all teams' offensive and defensive efficiencies compare in 2024 across all conferences based on a linear regression analysis?
+
+--Similar to the question above, using linear regression, this question investigates whether all teams across all conferences show balanced strengths in both offensive and defensive play, rather than just the SEC.
+
+```{r echo=FALSE}
+# Performing a linear regression analysis for all teams
+all_lm <- lm(ADJDE ~ ADJOE, data = cbb24)
+
+# Plotting the relationship
+ggplot(cbb24, aes(x = ADJOE, y = ADJDE)) +
+  geom_point(color = "purple") +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Offensive vs. Defensive Efficiencies for All Teams",
+       x = "Adjusted Offensive Efficiency",
+       y = "Adjusted Defensive Efficiency")
+
+# Summarizing regression results
+summary(all_lm)
+```
+
+# SUMMARY 1/5
+
+The goal of this analysis was to investigate factors that contribute to the success and challenges of NCAA Division I Men's Basketball teams during the 2024 season. Using a dataset of 362 teams with variables such as wins, turnovers, free throw rates, three-point shooting percentages, and adjusted efficiencies, the analysis aimed to uncover patterns and relationships that could explain team and conference performance and show us what could potentially contribute to the success and failures of basketball seasons.
+
+# Addressing the Problem Statement 2/5
+
+The following steps were performed:
+
+\- Removed missing values and formatted variables to ensure accuracy
+
+\- Examined metrics such as average wins, turnover rates, and shooting percentages using R for analysis and visualization
+
+\- Performed simple linear regression analyses to explore relationships between offensive and defensive efficiencies for both the SEC and all Division I teams.
+
+These methods provided a comprehensive framework for exploring and interpreting team performance.
+
+# Interesting Insights 3/5
+
+-   Conference Performance: The B12 conference had the highest average wins (20.4), while the SWAC conference had the lowest (12.8), highlighting differences in overall conference strength. (I considered the SWAC conference to have the lowest average of wins since the 'ind' conference was only Chicago St. since they were independent last season.)
+-   Three-Point Shooting: A positive correlation between three-point shooting percentages and wins was observed in the ACC, suggesting that accuracy from beyond the 3-point line contributes significantly to success.
+-   Turnovers: Top-performing teams exhibited an average turnover rate of 14.8%, well below the overall average of 17.14%, emphasizing the importance of ball control.
+-   Free Throw Rate: Among the top 20 teams, the average free throw rate was 35.65%, indicating the value of converting high-pressure opportunities.
+-   Efficiency Trade-offs: A significant negative relationship between offensive and defensive efficiencies across all teams revealed that teams often prioritize one aspect over the other, with a similar but weaker trend observed in the SEC.
+-   Top Teams: The top five teams demonstrated a greater focus on offensive efficiency (119.16) compared to defensive efficiency (95.04), suggesting that offensive dominance was key to success in 2024.
+
+# Implications of Findings 4/5
+
+The analysis provides actionable insights for coaches, analysts, and fans:
+
+\- Teams should prioritize three-point shooting accuracy and free throw performance to gain a competitive edge.
+
+\- Minimizing turnovers is a hallmark of top-performing teams and could be an area of focus for teams looking to improve.
+
+\- Conferences with high average wins, like the B12, may indicate better recruitment, coaching, or overall team quality.
+
+\- The trade-off between offensive and defensive efficiencies suggests that strategic specialization is common, and teams may need to decide whether to balance both or lean into one.
+
+# Limitations and Future Work 5/5
+
+-   The analysis was limited to the 2024 season, so trends may not generalize to other years.
+-   The dataset does not account for injuries, game schedules, or other external factors that may have influenced team performance.
+-   The differences in the number of teams within conferences may also skew averages.
+-   Incorporating individual player statistics could provide deeper insights into the roles and contributions of key players.
+
+Future research could address these limitations by analyzing multiple seasons, including player-level data, and normalizing metrics across conferences. Expanding the analysis could provide a better understanding of what drives success in collegiate basketball.
